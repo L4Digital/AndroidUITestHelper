@@ -1,0 +1,65 @@
+/*
+ * Copyright 2017 L4 Digital LLC. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+apply plugin: 'com.android.application'
+apply plugin: 'l4-android-ui-test'
+
+android {
+    compileSdkVersion rootProject.ext.sdkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+
+    defaultConfig {
+        applicationId "com.l4digital.testapplication"
+        minSdkVersion 16
+        targetSdkVersion rootProject.ext.sdkVersion
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+
+    testOptions {
+        animationsDisabled = true
+    }
+
+    applicationVariants.all { variant ->
+        if (variant.getBuildType().debuggable) {
+            tasks.findByName('grantPermissions').dependsOn variant.install
+            variant.testVariant.connectedInstrumentTest.dependsOn 'grantPermissions'
+        }
+    }
+}
+
+androidTestHelperConfig {
+    adbExecutablePath = android.adbExecutable
+}
+
+grantPermissions {
+    permissions = [
+            'android.permission.READ_EXTERNAL_STORAGE',
+            'android.permission.WRITE_EXTERNAL_STORAGE'
+    ]
+    targetPackageName = 'com.l4digital.testapplication'
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation('com.android.support:appcompat-v7:26.0.2') {
+        exclude module: 'support-annotations'
+    }
+    implementation 'com.android.support.constraint:constraint-layout:1.0.2'
+    androidTestImplementation project(':l4testlibrary')
+}

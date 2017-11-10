@@ -1,0 +1,155 @@
+/*
+ * Copyright 2017 L4 Digital LLC. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+apply plugin: 'com.android.library'
+apply plugin: 'com.jfrog.bintray'
+apply plugin: 'maven-publish'
+
+def libraryName = 'AndroidUITestHelper'
+def libraryArtifact = 'ui-test-helper'
+def libraryGroup = 'com.l4digital.androidtest'
+def libraryVersion = '0.0.1'
+
+android {
+    compileSdkVersion rootProject.ext.sdkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    defaultConfig {
+        minSdkVersion 16
+        targetSdkVersion rootProject.ext.sdkVersion
+        versionCode 1
+        versionName libraryVersion
+        testInstrumentationRunner 'android.support.test.runner.AndroidJUnitRunner'
+    }
+}
+
+dependencies {
+    api 'junit:junit:4.12'
+    // AndroidJUnitRunner and JUnit Rules
+    api "com.android.support.test:runner:$androidSupportTestVersion"
+    api("com.android.support.test:rules:$androidSupportTestVersion") {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    }
+    // Espresso dependencies
+    api("com.android.support.test.espresso:espresso-core:$espressoVersion") {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    }
+    api("com.android.support.test.espresso:espresso-contrib:$espressoVersion") {
+        exclude group: 'com.android.support', module: 'support-vector-drawable'
+        exclude group: 'com.android.support', module: 'support-compat'
+        exclude group: 'com.android.support', module: 'transition'
+        exclude group: 'com.android.support', module: 'support-media-compat'
+        exclude group: 'com.android.support', module: 'support-core-ui'
+        exclude group: 'com.android.support', module: 'support-core-utils'
+        exclude group: 'com.android.support', module: 'recyclerview-v7'
+        exclude group: 'com.android.support', module: 'appcompat-v7'
+        exclude group: 'com.android.support', module: 'design'
+        exclude group: 'com.android.support', module: 'support-fragment'
+        exclude group: 'com.android.support', module: 'support-v4'
+        exclude group: 'com.android.support', module: 'support-annotations'
+    }
+    api("com.android.support.test.espresso:espresso-intents:$espressoVersion") {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    }
+    api("com.android.support.test.espresso:espresso-web:$espressoVersion") {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    }
+    api "com.android.support.test.espresso.idling:idling-concurrent:$espressoVersion"
+    api "com.android.support.test.espresso:espresso-idling-resource:$espressoVersion"
+}
+
+task sourcesJar(type: Jar) {
+    classifier = 'sources'
+    from android.sourceSets.main.java.srcDirs
+}
+
+task javadoc(type: Javadoc) {
+    source = android.sourceSets.main.java.srcDirs
+    classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+task generateArchives(dependsOn: ['sourcesJar', 'javadocJar'])
+
+publishing {
+    publications {
+        aar(MavenPublication) {
+            groupId libraryGroup
+            artifactId libraryArtifact
+            version libraryVersion
+
+            artifact("$buildDir/outputs/aar/$artifactId-release.aar")
+
+            pom.withXml {
+                def dependencies = asNode().appendNode('dependencies')
+
+                configurations.getByName("api").allDependencies.each {
+                    def dependency = dependencies.appendNode('dependency')
+
+                    dependency.appendNode('groupId', it.group)
+                    dependency.appendNode('artifactId', it.name)
+                    dependency.appendNode('version', it.version)
+
+                    if (it.excludeRules.size() > 0) {
+                        def exclusions = dependency.appendNode('exclusions')
+
+                        it.excludeRules.each { ExcludeRule rule ->
+                            def exclusion = exclusions.appendNode('exclusion')
+
+                            exclusion.appendNode('groupId', rule.group)
+
+                            if (rule.module != null) {
+                                exclusion.appendNode('artifactId', rule.module)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        java(MavenPublication) {
+            groupId = libraryGroup
+            version = libraryVersion
+            artifactId = libraryArtifact
+
+            artifact sourcesJar
+            artifact javadocJar
+        }
+    }
+}
+
+bintray {
+    user = project.findProperty("bintray_user") ?: ""
+    key = project.findProperty("bintray_apikey") ?: ""
+
+    publications = ['aar', 'java']
+
+    pkg {
+        name = libraryName
+        repo = 'maven'
+        userOrg = 'l4digital'
+        licenses = ['Apache-2.0']
+
+        version {
+            name = libraryVersion
+            vcsTag = libraryVersion
+            released = new Date()
+        }
+    }
+}
